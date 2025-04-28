@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.16)
+
+project(ESP8266_Project)
+
+# Définir l'environnement PlatformIO
+set(PLATFORMIO_CMD platformio)
+
+# Générer le cache CMake pour PlatformIO
+execute_process(
+    COMMAND ${PLATFORMIO_CMD} init --ide clion
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/src)
+
+add_custom_target(upload ALL
+    COMMAND ${PLATFORMIO_CMD} run --target upload
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+
+add_custom_target(monitor ALL
+    COMMAND ${PLATFORMIO_CMD} device monitor
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
