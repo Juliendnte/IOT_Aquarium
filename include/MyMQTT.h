@@ -99,3 +99,192 @@
  * \note Même si on ne sait pas exactement comment, il semblerait que Facebook utilise 
  * des aspects de MQTT dans Facebook Messenger !
  */
+/************************* Configuration *************************************/
+// Connexion Adafruit
+#pragma once
+#define IO_SERVER         "io.adafruit.com"
+#define IO_SERVERPORT     1883
+#define IO_USERNAME       ""
+#define IO_KEY            ""
+//IO_USERNAME est ton nom sur adafruitIO
+//IO_KEY est ta clé sur adafruitIO
+// Feeds
+#define FEED_NB_RATION_CROQUETTE       "/feeds/croquette.nbration"
+#define FEED_NB_RATION_POISSON_ROUGE       "/feeds/poisson-rouge.nbration"
+#define FEED_NB_RATION_ACHIGAN       "/feeds/achigan.nbration"
+#define FEED_NB_RATION_RESTO       "/feeds/resto.nbration"
+#define FEED_COMMANDE       "/feeds/commande"
+#define FEED_READY       "/feeds/ready"
+#include <ESP8266WiFi.h>
+#include <Ticker.h>
+#include <WiFiClient.h>
+
+#include "Adafruit_MQTT_Client.h"
+#include "MyDebug.h"
+
+/************************** Variables ****************************************/
+// Instanciation du client WiFi qui servira à se connecter au broker Adafruit
+inline WiFiClient client;
+// Instanciation du client Adafruit avec les informations de connexion
+// En haut du fichier Distributeur.h
+#define MQTT_TIMEOUT_MS     5000
+#define MQTT_MAX_PACKET_SIZE 1024
+
+// Dans la création du client MQTT
+inline Adafruit_MQTT_Client MyAdafruitMqtt(&client, IO_SERVER, IO_SERVERPORT, IO_USERNAME, IO_USERNAME, IO_KEY);
+
+inline void setupMQTT() {
+    client.setTimeout(MQTT_TIMEOUT_MS);
+    client.setNoDelay(true);
+
+    // Configuration supplémentaire pour le client MQTT
+    MyAdafruitMqtt.setKeepAliveInterval(30); // 30 secondes
+}
+
+
+// Variable de stockage de la valeur du slider
+inline Ticker MyAdafruitTicker;
+/****************************** Feeds ****************************************/
+// Création des Feed auxquels nous allons souscrire :
+
+inline Adafruit_MQTT_Subscribe subNbRationCroquette = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt,
+                                                                              IO_USERNAME FEED_NB_RATION_CROQUETTE,
+                                                                              MQTT_QOS_1);
+inline Adafruit_MQTT_Subscribe subNbRationPoissonRouge = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt,
+    IO_USERNAME FEED_NB_RATION_POISSON_ROUGE,
+    MQTT_QOS_1);
+inline Adafruit_MQTT_Subscribe subNbRationAchigan = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt,
+                                                                            IO_USERNAME FEED_NB_RATION_ACHIGAN,
+                                                                            MQTT_QOS_1);
+inline Adafruit_MQTT_Subscribe subNbRationResto = Adafruit_MQTT_Subscribe(
+    &MyAdafruitMqtt, IO_USERNAME FEED_NB_RATION_RESTO,
+    MQTT_QOS_1);
+inline Adafruit_MQTT_Subscribe subCommande = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt, IO_USERNAME FEED_COMMANDE,
+                                                                     MQTT_QOS_1);
+inline Adafruit_MQTT_Subscribe subReady = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt, IO_USERNAME FEED_READY,
+                                                                  MQTT_QOS_1);
+
+inline Adafruit_MQTT_Publish pubNbRationCroquette = Adafruit_MQTT_Publish(&MyAdafruitMqtt,
+                                                                          IO_USERNAME FEED_NB_RATION_CROQUETTE);
+inline Adafruit_MQTT_Publish pubNbRationPoissonRouge = Adafruit_MQTT_Publish(&MyAdafruitMqtt,
+                                                                             IO_USERNAME FEED_NB_RATION_POISSON_ROUGE);
+inline Adafruit_MQTT_Publish pubNbRationAchigan = Adafruit_MQTT_Publish(
+    &MyAdafruitMqtt, IO_USERNAME FEED_NB_RATION_ACHIGAN);
+inline Adafruit_MQTT_Publish pubNbRationResto =
+        Adafruit_MQTT_Publish(&MyAdafruitMqtt, IO_USERNAME FEED_NB_RATION_RESTO);
+inline Adafruit_MQTT_Publish pubCommande = Adafruit_MQTT_Publish(&MyAdafruitMqtt, IO_USERNAME FEED_COMMANDE);
+inline Adafruit_MQTT_Publish pubReady = Adafruit_MQTT_Publish(&MyAdafruitMqtt, IO_USERNAME FEED_READY);
+
+inline Ticker croquetteTicker;
+inline Ticker poissonRougeTicker;
+inline Ticker achiganTicker;
+inline Ticker achiganRestoTicker;
+
+inline void connectAdafruitIO() {
+    static unsigned long lastAttempt = 0;
+    constexpr unsigned long retryInterval = 15000;
+
+    unsigned long now = millis();
+    if (now - lastAttempt < retryInterval) {
+        return;
+    }
+    lastAttempt = now;
+
+    // Vérification du WiFi
+    if (WiFi.status() != WL_CONNECTED) {
+        MYDEBUG_PRINTLN("WiFi non connecté");
+        return;
+    }
+
+    MYDEBUG_PRINT("-AdafruitIO : Connexion au broker... ");
+
+    // Nettoyage des connexions existantes
+    client.stop();
+    delay(1000);
+
+    // Tentative de connexion avec plus de détails
+    int8_t ret = MyAdafruitMqtt.connect();
+    uint8_t retries = 3;
+
+    while (retries--) {
+        ret = MyAdafruitMqtt.connect();
+        if (ret == 0) break;
+
+        MYDEBUG_PRINT("\nErreur de connexion (");
+        MYDEBUG_PRINT(ret);
+        MYDEBUG_PRINT("): ");
+        MYDEBUG_PRINTLN(MyAdafruitMqtt.connectErrorString(ret));
+        delay(2000);
+    }
+
+    if (ret == 0) {
+        MYDEBUG_PRINTLN("OK");
+
+        // Configuration des souscriptions
+        if (!MyAdafruitMqtt.subscribe(&subNbRationCroquette))
+            MYDEBUG_PRINTLN("Échec sub croquette");
+        if (!MyAdafruitMqtt.subscribe(&subNbRationPoissonRouge))
+            MYDEBUG_PRINTLN("Échec sub poisson rouge");
+        if (!MyAdafruitMqtt.subscribe(&subNbRationAchigan))
+            MYDEBUG_PRINTLN("Échec sub achigan");
+        if (!MyAdafruitMqtt.subscribe(&subNbRationResto))
+            MYDEBUG_PRINTLN("Échec sub resto");
+        if (!MyAdafruitMqtt.subscribe(&subCommande))
+            MYDEBUG_PRINTLN("Échec sub commande");
+        if (!MyAdafruitMqtt.subscribe(&subReady))
+            MYDEBUG_PRINTLN("Échec sub ready");
+        MYDEBUG_PRINTLN("=== Connexion Adafruit IO réussie ===");
+    } else {
+        MYDEBUG_PRINTLN("=== Échec de connexion Adafruit IO ===");
+        MYDEBUG_PRINTLN("Code d'erreur : " + String(ret));
+        MYDEBUG_PRINTLN("Détail : " + String(MyAdafruitMqtt.connectErrorString(ret)));
+    }
+}
+
+inline bool ensureConnected() {
+    if (!MyAdafruitMqtt.connected()) {
+        MYDEBUG_PRINTLN("Reconnexion nécessaire avant publication");
+        connectAdafruitIO();
+        return MyAdafruitMqtt.connected();
+    }
+    return true;
+}
+
+inline void publishToMQTT(const char *feed, const String &value) {
+    if (!ensureConnected()) {
+        MYDEBUG_PRINTLN("Échec de la connexion MQTT");
+        return;
+    }
+
+    // Sélection du bon publisher en fonction du feed
+    Adafruit_MQTT_Publish *publisher = nullptr;
+    if (strcmp(feed, "commande") == 0) {
+        publisher = &pubCommande;
+    }
+    // Ajoutez d'autres conditions si nécessaire pour d'autres feeds
+
+    if (publisher) {
+        if (!publisher->publish(value.c_str())) {
+            MYDEBUG_PRINTLN("Échec de la publication MQTT");
+        } else {
+            MYDEBUG_PRINTLN("Publication MQTT réussie : " + String(feed) + " = " + value);
+        }
+    }
+}
+
+inline int getReadyCount() {
+    if (!ensureConnected()) {
+        MYDEBUG_PRINTLN("Échec de la connexion MQTT");
+        return 0;
+    }
+
+    // Vérifie s'il y a des données disponibles sur le feed ready
+    const Adafruit_MQTT_Subscribe *subscription = &subReady;
+
+    // Lecture de la dernière valeur
+    if (const auto readyValue = reinterpret_cast<const char *>(subscription->lastread)) {
+        return atoi(readyValue);
+    }
+
+    return 0;
+}
