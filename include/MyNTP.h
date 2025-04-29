@@ -19,14 +19,17 @@
  */
 #ifndef MYNTP_H
 #define MYNTP_H
+#include <ESP8266WiFi.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
-WiFiUDP ntpUDP;
-  // Avec l'heure d'été, nous avons en France 1h (3600s) de décalage avec le méridien de Greenwich (Greenwich Meridian Time : GMT) en hiver.
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+#include "MyDebug.h"
 
-void getNTP(){
+inline WiFiUDP ntpUDP;
+  // Avec l'heure d'été, nous avons en France 1h (3600s) de décalage avec le méridien de Greenwich (Greenwich Meridian Time : GMT) en hiver.
+inline NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+
+inline void getNTP(){
   MYDEBUG_PRINT("-NTP : ");
   // mise à jour de l'heure
   timeClient.update();
@@ -34,7 +37,7 @@ void getNTP(){
   MYDEBUG_PRINTLN(timeClient.getFormattedTime());
 }
 
-void setupNTP(){
+inline void setupNTP(){
   // On a besoin d'une connexion à Internet !
   if (WiFi.status() != WL_CONNECTED){
     //setupWiFi();

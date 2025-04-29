@@ -60,7 +60,7 @@ inline String strTestFile("/spiffs_test.txt");
 inline String strTrackingFile("/spiffs_tracking.txt");
 inline File configFile, trackingFile;
 
-inline void logTracking(const String& strTrackingText) {
+inline void logTracking(const String &strTrackingText) {
     trackingFile = SPIFFS.open(strTrackingFile, "a");
     if (trackingFile) {
         timeClient.update();
@@ -98,55 +98,79 @@ inline void setupSPIFFS(bool bFormat = false) {
         }
 
         // Fichier de configuration
-        if (SPIFFS.exists(strConfigFile)) {
-            // ------------------------- Le fichier existe
-            //Ouverture du fichier en lecture
-            MYDEBUG_PRINTLN("-SPIFFS : Lecture du fichier de configuration");
-            configFile = SPIFFS.open(strConfigFile, "r");
-            if (configFile) {
-                MYDEBUG_PRINTLN("-SPIFFS : Fichier ouvert");
-                //Lecture du fichier sous la forme d'un document JSON
-                DynamicJsonDocument jsonDocument(512);
-                // Désérialisation du document JSON lu
-                DeserializationError error = deserializeJson(jsonDocument, configFile);
-                if (error) {
-                    MYDEBUG_PRINTLN("-SPIFFS : Impossible de parser le JSON");
-                } else {
-                    MYDEBUG_PRINTLN("-JSON: Fichier parsé");
-                    String parametre1 = jsonDocument["ssid"];
-                    String parametre2 = jsonDocument["password"];
-                    sstation_ssid = parametre1;
-                    sstation_password = parametre2;
-                    MYDEBUG_PRINT("-JSON [ssid] : ");
-                    MYDEBUG_PRINTLN(sstation_ssid);
-                    MYDEBUG_PRINT("-JSON [password] : ");
-                    MYDEBUG_PRINTLN(sstation_password);
-                }
-            }
-            configFile.close();
-            MYDEBUG_PRINTLN("-SPIFFS: Fichier fermé");
-        } else {
-            // ------------------- Le fichier n'existe pas
-            // Initialisation du fichier de configuration avec des valeurs vides
+        if (!SPIFFS.exists(strConfigFile)) {
             MYDEBUG_PRINTLN("-SPIFFS: Le fichier de configuration n'existe pas");
             File configFile = SPIFFS.open(strConfigFile, "w");
             if (configFile) {
                 MYDEBUG_PRINTLN("-SPIFFS: Fichier créé");
-                DynamicJsonDocument jsonDocument(512);
-                // Exemple de 3 paramètres
+                DynamicJsonDocument jsonDocument(2048); // Augmenter la taille pour les distributeurs
+
+                // Création de la structure des distributeurs
+                JsonObject distributeurs = jsonDocument.createNestedObject("distributeurs");
+
+                // Configuration Croquette
+                JsonObject croquette = distributeurs.createNestedObject("croquette");
+                croquette["nom"] = "Croquette";
+                croquette["nbRation"] = 30000;
+                croquette["nbMin"] = 1000;
+                croquette["nbMax"] = 50000;
+                croquette["nbBySecSend"] = 10;
+                croquette["nbSendRation"] = 1000;
+                croquette["copulation"] = 0;
+                croquette["copulationSec"] = 0;
+                croquette["eat"] = 0;
+
+                // Configuration Poisson Rouge
+                JsonObject poissonRouge = distributeurs.createNestedObject("poissonRouge");
+                poissonRouge["nom"] = "Poisson Rouge";
+                poissonRouge["nbRation"] = 30;
+                poissonRouge["nbMin"] = 20;
+                poissonRouge["nbMax"] = 100;
+                poissonRouge["nbBySecSend"] = 10;
+                poissonRouge["nbSendRation"] = 3;
+                poissonRouge["copulation"] = 3;
+                poissonRouge["copulationSec"] = 15;
+                poissonRouge["eat"] = 2000;
+
+                // Configuration Achigan
+                JsonObject achigan = distributeurs.createNestedObject("achigan");
+                achigan["nom"] = "Achigan";
+                achigan["nbRation"] = 10;
+                achigan["nbMin"] = 5;
+                achigan["nbMax"] = 20;
+                achigan["nbBySecSend"] = 10;
+                achigan["nbSendRation"] = 2;
+                achigan["copulation"] = 1;
+                achigan["copulationSec"] = 40;
+                achigan["eat"] = 4;
+
+                // Configuration Achigan Restaurant
+                JsonObject achiganResto = distributeurs.createNestedObject("achiganResto");
+                achiganResto["nom"] = "Achigan du Restaurant";
+                achiganResto["nbRation"] = 12;
+                achiganResto["nbMin"] = 5;
+                achiganResto["nbMax"] = 30;
+                achiganResto["nbBySecSend"] = 10;
+                achiganResto["nbSendRation"] = 1;
+                achiganResto["copulation"] = 1;
+                achiganResto["copulationSec"] = 40;
+                achiganResto["eat"] = 1;
+
+                // Ajout des paramètres WiFi
                 jsonDocument["ssid"] = String("");
                 jsonDocument["password"] = String("");
-                // Sérialisation du JSON dans le fichier de configuration
+
+                // Sérialisation du JSON dans le fichier
                 if (serializeJson(jsonDocument, configFile) == 0) {
                     MYDEBUG_PRINTLN("-SPIFFS : Impossible d'écrire le JSON dans le fichier de configuration");
                 }
-                // Fermeture du fichier
                 configFile.close();
                 MYDEBUG_PRINTLN("-SPIFFS : Fichier fermé");
             } else {
-                MYDEBUG_PRINTLN("-SPIFFS : Impossible d'ouvrir le fichier en ecriture");
+                MYDEBUG_PRINTLN("-SPIFFS : Impossible d'ouvrir le fichier en écriture");
             }
         }
+
 
         // Fichier de Tracking
         if (SPIFFS.exists(strTrackingFile)) {

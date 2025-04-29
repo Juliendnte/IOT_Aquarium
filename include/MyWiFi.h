@@ -1,4 +1,4 @@
- /**
+/**
  * \file MyWifi.h
  * \page wifi Wifi ESP32
  * 
@@ -87,6 +87,7 @@
 
 // Variables
 // pour le mode STATION
+#include "MyDebug.h"
 #include "WIFI_CREDENTIALS.h"
 
 // ------------------------------------------------------------------------------------------------
@@ -102,32 +103,32 @@
 #ifndef MY_WIFI_H
 #define MY_WIFI_H
 
- inline void setupWiFi(){
-  MYDEBUG_PRINTLN();
-  MYDEBUG_PRINT("-WIFI : Configuration");
+inline void setupWiFi() {
+    MYDEBUG_PRINTLN();
+    MYDEBUG_PRINT("-WIFI : Configuration");
 
-  // Configuration de la carte en mode Access Point ET Station
-  WiFi.mode(WIFI_AP_STA);
-  //WiFi.mode(WIFI_STA);
+    // Configuration de la carte en mode Access Point ET Station
+    WiFi.mode(WIFI_AP_STA);
+    //WiFi.mode(WIFI_STA);
 
-  // Démarrage du mode Access Point
-  WiFi.softAP(ap_ssid, ap_password);
-  // J'affiche l'adresse IP de mon point d'accès
-  MYDEBUG_PRINT("-WIFI : Access Point mis à disposition : ");
-  MYDEBUG_PRINTLN(WiFi.softAPIP());
+    // Démarrage du mode Access Point
+    WiFi.softAP(ap_ssid, ap_password);
+    // J'affiche l'adresse IP de mon point d'accès
+    MYDEBUG_PRINT("-WIFI : Access Point mis à disposition : ");
+    MYDEBUG_PRINTLN(WiFi.softAPIP());
 
-  // Démarrage du mode Station
-  WiFi.begin(station_ssid, station_password);
-  
-  MYDEBUG_PRINT("-WIFI : Connexion au réseau : ");
-  MYDEBUG_PRINTLN(station_ssid);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    MYDEBUG_PRINT(".");
-  }
-  MYDEBUG_PRINTLN("");
-  // J'affiche l'adresse IP de ma carte
-  MYDEBUG_PRINT("-WIFI : connecté en mode Station avec l'adresse IP : ");
-  MYDEBUG_PRINTLN(WiFi.localIP());
+    // Démarrage du mode Station
+    WiFi.begin(station_ssid, station_password);
+
+    MYDEBUG_PRINT("-WIFI : Connexion au réseau : ");
+    MYDEBUG_PRINTLN(station_ssid);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        MYDEBUG_PRINT(".");
+    }
+    MYDEBUG_PRINTLN("");
+    // J'affiche l'adresse IP de ma carte
+    MYDEBUG_PRINT("-WIFI : connecté en mode Station avec l'adresse IP : ");
+    MYDEBUG_PRINTLN(WiFi.localIP());
 }
 #endif

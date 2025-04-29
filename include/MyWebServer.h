@@ -29,190 +29,183 @@
  */
 
 // Librairies nécessaires, en fonction de la carte utilisée
-#if MYCARD == ESP32
-#include <WebServer.h>
-#elif MYCARD == ESP8266
+#pragma once
 #include <ESP8266WebServer.h>
-#endif
+
+#include "MyDebug.h"
+#include "MyWiFi.h"
+#include <NTPClient.h>
+
+// Déclaration des fonctions externes
+extern void publishToMQTT(const char *feed, const String &value);
+
+extern int getReadyCount();
 
 // Variables
-#if MYCARD == ESP32
-WebServer monWebServeur(80);           // Serveur web sur le port 80
-#elif MYCARD == ESP8266
-ESP8266WebServer monWebServeur(80);
-#endif
+inline ESP8266WebServer monWebServeur(80);
 /**
  * Fonction de gestion de la route /
  */
-void handleRoot() {
-  MYDEBUG_PRINTLN("-WEBSERVER : requete root");
-  timeClient.update();
+inline void handleRoot() {
+    MYDEBUG_PRINTLN("-WEBSERVER : requete root");
+    timeClient.update();
 
-  // Préparation du code HTML à retourner
-  String out = "";
-  out += "<html><head><meta http-equiv='refresh' content='30'/>";
-  out += "<title>YNOV - Projet IoT B2</title>";
-  out += "<style>body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }</style>";
-  out += "</head><body>";
-  out += "<h1>Bienvenue</h1><br>";
-  out += "<h1>";
-  out += timeClient.getFormattedTime();
-  out += "</h1>";
-  out += "Depuis cette page, vous pouvez<br><ul>";
-  out +="<li><a href=\"scan\"> Scanner le WiFi</a></li>";
-  out +="<li><a href=\"adafruit\"> Adafruit</a></li>";
-  out +="<li><a href=\"format\"> Formater le SPIFFS</a></li>";
-  out +="<li><a href=\"config\"> Configurer le WiFi</a></li></ul>";
-  out += "</body></html>";
-
-  // Envoi de la réponse en HTML
-  monWebServeur.send(200, "text/html", out);
-}
-
-/**
- * Fonction de gestion de la route /scan
- */
-void handleScan() {
-  MYDEBUG_PRINTLN("-WEBSERVER : requete scan");
-
-  // La carte scanne les réseaux WiFi à proximité
-  int n = WiFi.scanNetworks();
-
-  // Construction de la réponse HTML
-  String out = "";
-  out += "<html><head><meta http-equiv='refresh' content='5'/>";
-  out += "<title>YNOV - Projet IoT B2</title>";
-  out += "<style>body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }</style>";
-  out += "</head><body>";
-  out += "<h1>Page de scan</h1><br>";
-
-  // Intégration des réseaux WiFi trouvés dans la page HTML
-  if (n == 0) {
-    MYDEBUG_PRINTLN("- AUCUN réseau WiFi trouvé");
-  } else {
-    out += "<ul>";
-    for (int i = 0; i < n; ++i) {
-      out += "<li>"+ WiFi.SSID(i) +"</li>";
+    if (monWebServeur.hasArg("commande")) {
+        String commande = monWebServeur.arg("commande");
+        publishToMQTT("commande", commande);
     }
-    out += "</ul>";
-  }
 
-  // Fin de la réponse HTML
-  out += "</body></html>";
+    String out = "";
+    out += "<html><head>";
+    out += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    out += "<meta http-equiv='refresh' content='30'/>";
+    out += "<title>YNOV - Projet IoT B2</title>";
+    out += "<style>";
+    out += "* { margin: 0; padding: 0; box-sizing: border-box; }";
+    out += "body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #1a1a1a; line-height: 1.6; }";
+    out += ".container { max-width: 1000px; margin: 2rem auto; padding: 0 20px; }";
+    out += ".header { background: #ffffff; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }";
+    out += ".header h1 { color: #2c3e50; font-size: 2rem; margin-bottom: 1rem; }";
+    out += ".card { background: #ffffff; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }";
+    out += ".form-group { margin-bottom: 1.5rem; }";
+    out += ".form-group h2 { color: #2c3e50; margin-bottom: 1rem; }";
+    out += "select { padding: 0.8rem; border: 1px solid #ddd; border-radius: 5px; width: 200px; margin-right: 1rem; font-size: 1rem; }";
+    out += ".btn { background: #4CAF50; color: white; padding: 0.8rem 2rem; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; transition: background 0.3s ease; }";
+    out += ".btn:hover { background: #45a049; }";
+    out += ".status { background: #ffffff; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }";
+    out += ".status h2 { color: #2c3e50; margin-bottom: 1rem; }";
+    out += ".status-value { font-size: 2rem; color: #4CAF50; font-weight: bold; }";
+    out += "@media (max-width: 600px) {";
+    out += "  .container { margin: 1rem auto; }";
+    out += "  .header, .card, .status { padding: 1rem; }";
+    out += "  select { width: 100%; margin-bottom: 1rem; }";
+    out += "  .btn { width: 100%; }";
+    out += "}";
+    out += "</style>";
+    out += "</head><body>";
 
-  // Envoi de la page HTML
-  monWebServeur.send(200, "text/html", out);
-}
+    out += "<div class='container'>";
+    out += "<div class='header'>";
+    out += "<h1>Tableau de bord - " + timeClient.getFormattedTime() + "</h1>";
+    out += "</div>";
 
-/**
- * Fonction de gestion de la route /config
- */
-void handleConfig() {
-  MYDEBUG_PRINTLN("-WEBSERVER : requete config");
+    out += "<div class='card'>";
+    out += "<div class='form-group'>";
+    out += "<form action='/' method='post'>";
+    out += "<h2>Commande d'Achigan</h2>";
+    out += "<select name='commande'>";
+    for(int i = 1; i <= 10; i++) {
+        out += "<option value='" + String(i) + "'>" + String(i) + "</option>";
+    }
+    out += "</select>";
+    out += "<button type='submit' class='btn'>Envoyer la commande</button>";
+    out += "</form>";
+    out += "</div>";
+    out += "</div>";
 
-  // Construction de la réponse HTML
-  String out = "";
-  out += "<html><head><meta http-equiv='refresh' content='30'/>";
-  out += "<title>YNOV - Projet IoT B2</title>";
-  out += "<style>body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }</style>";
-  out += "</head><body>";
-  out += "<h1>Page de config</h1><br>";
-  out += "</body></html>";
+    out += "<div class='status'>";
+    out += "<h2>Etat actuel</h2>";
+    out += "<div class='status-value'>" + String(getReadyCount()) + "</div>";
+    out += "<p>Recettes pretes</p>";
+    out += "</div>";
 
-  // Envoi de la réponse HTML
-  monWebServeur.send(200, "text/html", out);
-}
+    out += "</div></body></html>";
 
-/**
- * Fonction de gestion de la route /format
- */
-void handleFormat() {
-  MYDEBUG_PRINTLN("-WEBSERVER : requete format");
-  //setupSPIFFS(true);
-  String out = "";
-  out += "<html><head><meta http-equiv='refresh' content='30'/>";
-  out += "<title>YNOV - Projet IoT B2</title>";
-  out += "<style>body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }</style>";
-  out += "</head><body>";
-  out += "<h1>Formatage fini</h1><br>";
-  out += "<a href=\"/\"> Retour</a>";
-  out += "</body></html>";
-  monWebServeur.send(200, "text/html", out);
-}
-
-/**
- * Fonction de gestion de la route /adafruit
- */
-void handleAdafruit() {
-  MYDEBUG_PRINTLN("-WEBSERVER : requete adafruit");
-
-  // Construction de la réponse HTML
-  String out = "";
-  out += "<html><head><meta http-equiv='refresh' content='5'/>";
-  out += "<title>YNOV - Projet IoT B2</title>";
-  out += "<style>body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }</style>";
-  out += "</head><body>";
-  out += "<h1>Adafruit</h1><br>";
-  out += "<form action=\"\" method=\"get\" class=\"form-example\">";
-  out += "<label for=\"slider\">Valeur du slider :</label><input type=\"range\" id=\"slider\" name=\"slider\" min=\"0\" max=\"100\" value=\"";
-//  out += dSliderValue;
-  out += "On verra ça plus tard";
-  out += "\" step=\"10\">";
-  out += "</form>";
-  out += "</body></html>";
-
-  // Envoi de la réponse HTML 
-  monWebServeur.send(200, "text/html", out);
+    monWebServeur.send(200, "text/html", out);
 }
 
 /**
  * En cas d'erreur de route, renvoi d'un message d'erreur 404
  */
-void handleNotFound() {
-  MYDEBUG_PRINTLN("-WEBSERVER : erreur de route");
+inline void handleNotFound() {
+    MYDEBUG_PRINTLN("-WEBSERVER : erreur de route");
 
-  // Construction de la réponse HTML
-  String message = "File Not Found\n\n";
-  message += "URI: ";
-  message += monWebServeur.uri();
-  message += "\nMethod: ";
-  message += (monWebServeur.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += monWebServeur.args();
-  message += "\n";
-  for (uint8_t i = 0; i < monWebServeur.args(); i++) {
-    message += " " + monWebServeur.argName(i) + ": " + monWebServeur.arg(i) + "\n";
-  }
+    // Construction de la réponse HTML
+    String message = "File Not Found\n\n";
+    message += "URI: ";
+    message += monWebServeur.uri();
+    message += "\nMethod: ";
+    message += (monWebServeur.method() == HTTP_GET) ? "GET" : "POST";
+    message += "\nArguments: ";
+    message += monWebServeur.args();
+    message += "\n";
+    for (uint8_t i = 0; i < monWebServeur.args(); i++) {
+        message += " " + monWebServeur.argName(i) + ": " + monWebServeur.arg(i) + "\n";
+    }
 
-  // Envoi de la réponse HTML
-  monWebServeur.send(404, "text/plain", message);
+    // Envoi de la réponse HTML
+    monWebServeur.send(404, "text/plain", message);
+}
+
+inline void handleDebug() {
+    String out = "";
+    out += "<html><head>";
+    out += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+    out += "<meta http-equiv='refresh' content='5'/>";
+    out += "<title>Debug ESP8266</title>";
+    out += "<style>";
+    out += "body { font-family: monospace; background: #1e1e1e; color: #00ff00; margin: 20px; }";
+    out += ".debug-container { background: #000; padding: 20px; border-radius: 5px; }";
+    out += ".debug-title { color: #fff; margin-bottom: 20px; }";
+    out += "#serial-output { white-space: pre-wrap; }";
+    out += ".system-info { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #333; }";
+    out += "</style>";
+    out += "</head><body>";
+
+    out += "<div class='debug-container'>";
+    out += "<h1 class='debug-title'>ESP8266 Debug Console</h1>";
+
+    // Informations système
+    out += "<div class='system-info'>";
+    out += "ESP8266 Debug Information:\n";
+    out += "-------------------------\n";
+    out += "Free Heap: " + String(ESP.getFreeHeap()) + " bytes\n";
+    out += "WiFi Status: " + String(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected") + "\n";
+    out += "WiFi SSID: " + String(WiFi.SSID()) + "\n";
+    out += "IP Address: " + WiFi.localIP().toString() + "\n";  // Utilisation directe de toString()
+    out += "Uptime: " + String(millis() / 1000) + " seconds\n";
+    out += "</div>";
+
+    // Affichage des logs
+    out += "<div id='serial-output'>";
+    out += "Debug Logs:\n";
+    out += "-------------------------\n";
+    for (int i = 0; i < LOG_BUFFER_SIZE; i++) {
+        int index = (logIndex - 1 - i + LOG_BUFFER_SIZE) % LOG_BUFFER_SIZE;
+        if (logBuffer[index].length() > 0) {
+            out += logBuffer[index] + "\n";
+        }
+    }
+    out += "</div></div>";
+    out += "</body></html>";
+
+    monWebServeur.send(200, "text/html", out);
 }
 
 /**
  * Initialisation du serveur web
  */
-void setupWebServer(){
-  // On a besoin d'une connexion WiFi !
-  // Test de la connexion WiFi. Si elle n'est pas active alors on démarre le WiFi
-  if (WiFi.status() != WL_CONNECTED){setupWiFi();}  // Connexion WiFi
-  MYDEBUG_PRINTLN("-WEBSERVER : Démarrage");
+inline void setupWebServer() {
+    // On a besoin d'une connexion WiFi !
+    // Test de la connexion WiFi. Si elle n'est pas active alors on démarre le WiFi
+    if (WiFi.status() != WL_CONNECTED) { setupWiFi(); } // Connexion WiFi
+    MYDEBUG_PRINTLN("-WEBSERVER : Démarrage");
 
-  // Configuration de mon serveur web en définissant plusieurs routes
-  // A chaque route est associée une fonction
-  monWebServeur.on("/", handleRoot);
-  monWebServeur.on("/scan", handleScan);
-  monWebServeur.on("/config", handleConfig);
-  monWebServeur.on("/adafruit", handleAdafruit);
-  monWebServeur.onNotFound(handleNotFound);
-  monWebServeur.on("/format", handleFormat);            // A ajouter quand le SPIFFFS est activé
+    // Configuration de mon serveur web en définissant plusieurs routes
+    // A chaque route est associée une fonction
+    monWebServeur.on("/", HTTP_GET, handleRoot);
+    monWebServeur.on("/", HTTP_POST, handleRoot);
+    monWebServeur.on("/debug", HTTP_GET, handleDebug);
 
-  monWebServeur.begin();                                  // Démarrage du serveur
-  MYDEBUG_PRINTLN("-WEBSERVER : Serveur Web démarré");
+    monWebServeur.onNotFound(handleNotFound);
+
+    monWebServeur.begin(); // Démarrage du serveur
+    MYDEBUG_PRINTLN("-WEBSERVER : Serveur Web démarré");
 }
 
 /**
  * Loop pour le serveur web afin qu'il regarde s'il a reçu des requêtes afin de les traiter
  */
-void loopWebServer(void) {
-  monWebServeur.handleClient();
+inline void loopWebServer() {
+    monWebServeur.handleClient();
 }
