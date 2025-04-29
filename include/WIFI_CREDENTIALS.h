@@ -1,14 +1,12 @@
 #ifndef WIFI_CREDENTIALS_H
 #define WIFI_CREDENTIALS_H
-#include "../lib/env.hpp"
-inline EnvLoader env;
 
 // pour le mode STATION
-inline String station_ssid = String(env.get("WIFI_STATION_SSID").c_str());
-inline String station_password = String(env.get("WIFI_STATION_PASSWORD").c_str());
+inline auto station_ssid     = "";       // Nom du réseau WiFi pour accéder à internet en mode Station
+inline auto station_password = "";   // Mot de passe du réseau WiFi pour accéder à internet en mode Station
 // pour le mode ACCESS POINT
-inline String ap_ssid = String(env.get("WIFI_AP_SSID").c_str());
-inline String ap_password = String(env.get("WIFI_AP_PASSWORD").c_str());
+inline auto ap_ssid     = "";      // Nom du réseau WiFi pour accéder à mon serveur web
+inline auto ap_password = "";     // Mot de passe du réseau WiFi pour accéder à l'Access Point
 inline String sstation_ssid;
 inline String sstation_password;
 
