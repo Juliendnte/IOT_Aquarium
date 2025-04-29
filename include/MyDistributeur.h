@@ -6,153 +6,10 @@
 #include <iostream>
 #include <utility>
 #include <Ticker.h>
-#include <WiFiClient.h>
 #include "MyDebug.h"
 #include "Adafruit_MQTT_Client.h"
-#include "../lib/env.hpp"
-/************************* Configuration *************************************/
-#define IO_SERVER         "io.adafruit.com"
-#define IO_SERVERPORT     1883
+#include "MyMQTT.h"
 
-static std::string key = env.get("IO_KEY");
-
-#define IO_USERNAME       "Juliendnte"
-#define IO_KEY           key.c_str()
-
-
-// Feeds
-#define FEED_NB_RATION_CROQUETTE       "/feeds/croquette.nbration"
-#define FEED_NB_RATION_POISSON_ROUGE       "/feeds/poisson-rouge.nbration"
-#define FEED_NB_RATION_ACHIGAN       "/feeds/achigan.nbration"
-#define FEED_NB_RATION_RESTO       "/feeds/resto.nbration"
-#define FEED_COMMANDE       "/feeds/commande"
-#define FEED_READY       "/feeds/ready"
-
-/************************** Variables ****************************************/
-// Instanciation du client WiFi qui servira à se connecter au broker Adafruit
-inline WiFiClient client;
-// Instanciation du client Adafruit avec les informations de connexion
-// En haut du fichier Distributeur.h
-#define MQTT_TIMEOUT_MS     5000
-#define MQTT_MAX_PACKET_SIZE 1024
-
-// Dans la création du client MQTT
-inline Adafruit_MQTT_Client MyAdafruitMqtt(&client, IO_SERVER, IO_SERVERPORT, IO_USERNAME, IO_USERNAME, IO_KEY);
-
-inline void setupMQTT() {
-    client.setTimeout(MQTT_TIMEOUT_MS);
-    client.setNoDelay(true);
-
-    // Configuration supplémentaire pour le client MQTT
-    MyAdafruitMqtt.setKeepAliveInterval(15); // 15 secondes
-}
-
-
-// Variable de stockage de la valeur du slider
-inline Ticker MyAdafruitTicker;
-/****************************** Feeds ****************************************/
-// Création des Feed auxquels nous allons souscrire :
-
-inline Adafruit_MQTT_Subscribe subNbRationCroquette = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt,
-                                                                              IO_USERNAME FEED_NB_RATION_CROQUETTE,
-                                                                              MQTT_QOS_1);
-inline Adafruit_MQTT_Subscribe subNbRationPoissonRouge = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt,
-    IO_USERNAME FEED_NB_RATION_POISSON_ROUGE,
-    MQTT_QOS_1);
-inline Adafruit_MQTT_Subscribe subNbRationAchigan = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt,
-                                                                            IO_USERNAME FEED_NB_RATION_ACHIGAN,
-                                                                            MQTT_QOS_1);
-inline Adafruit_MQTT_Subscribe subNbRationResto = Adafruit_MQTT_Subscribe(
-    &MyAdafruitMqtt, IO_USERNAME FEED_NB_RATION_RESTO,
-    MQTT_QOS_1);
-inline Adafruit_MQTT_Subscribe subCommande = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt, IO_USERNAME FEED_COMMANDE,
-                                                                     MQTT_QOS_1);
-inline Adafruit_MQTT_Subscribe subReady = Adafruit_MQTT_Subscribe(&MyAdafruitMqtt, IO_USERNAME FEED_READY,
-                                                                  MQTT_QOS_1);
-
-inline Adafruit_MQTT_Publish pubNbRationCroquette = Adafruit_MQTT_Publish(&MyAdafruitMqtt,
-                                                                          IO_USERNAME FEED_NB_RATION_CROQUETTE);
-inline Adafruit_MQTT_Publish pubNbRationPoissonRouge = Adafruit_MQTT_Publish(&MyAdafruitMqtt,
-                                                                             IO_USERNAME FEED_NB_RATION_POISSON_ROUGE);
-inline Adafruit_MQTT_Publish pubNbRationAchigan = Adafruit_MQTT_Publish(
-    &MyAdafruitMqtt, IO_USERNAME FEED_NB_RATION_ACHIGAN);
-inline Adafruit_MQTT_Publish pubNbRationResto =
-        Adafruit_MQTT_Publish(&MyAdafruitMqtt, IO_USERNAME FEED_NB_RATION_RESTO);
-inline Adafruit_MQTT_Publish pubCommande = Adafruit_MQTT_Publish(&MyAdafruitMqtt, IO_USERNAME FEED_COMMANDE);
-inline Adafruit_MQTT_Publish pubReady = Adafruit_MQTT_Publish(&MyAdafruitMqtt, IO_USERNAME FEED_READY);
-
-inline Ticker croquetteTicker;
-inline Ticker poissonRougeTicker;
-inline Ticker achiganTicker;
-inline Ticker achiganRestoTicker;
-
-inline void connectAdafruitIO() {
-    static unsigned long lastAttempt = 0;
-    constexpr unsigned long retryInterval = 15000;
-
-    unsigned long now = millis();
-    if (now - lastAttempt < retryInterval) {
-        return;
-    }
-    lastAttempt = now;
-
-    // Vérification du WiFi
-    if (WiFi.status() != WL_CONNECTED) {
-        MYDEBUG_PRINTLN("WiFi non connecté");
-        return;
-    }
-
-    MYDEBUG_PRINT("-AdafruitIO : Connexion au broker... ");
-
-    // Nettoyage des connexions existantes
-    client.stop();
-    delay(1000);
-
-    // Tentative de connexion avec plus de détails
-    int8_t ret = MyAdafruitMqtt.connect();
-    uint8_t retries = 3;
-
-    while (retries--) {
-        ret = MyAdafruitMqtt.connect();
-        if (ret == 0) break;
-
-        MYDEBUG_PRINT("\nErreur de connexion (");
-        MYDEBUG_PRINT(ret);
-        MYDEBUG_PRINT("): ");
-        MYDEBUG_PRINTLN(MyAdafruitMqtt.connectErrorString(ret));
-        delay(2000);
-    }
-
-    if (ret == 0) {
-        MYDEBUG_PRINTLN("OK");
-
-        // Configuration des souscriptions
-        if (!MyAdafruitMqtt.subscribe(&subNbRationCroquette))
-            MYDEBUG_PRINTLN("Échec sub croquette");
-        if (!MyAdafruitMqtt.subscribe(&subNbRationPoissonRouge))
-            MYDEBUG_PRINTLN("Échec sub poisson rouge");
-        if (!MyAdafruitMqtt.subscribe(&subNbRationAchigan))
-            MYDEBUG_PRINTLN("Échec sub achigan");
-        if (!MyAdafruitMqtt.subscribe(&subNbRationResto))
-            MYDEBUG_PRINTLN("Échec sub resto");
-        if (!MyAdafruitMqtt.subscribe(&subCommande))
-            MYDEBUG_PRINTLN("Échec sub commande");
-        MYDEBUG_PRINTLN("=== Connexion Adafruit IO réussie ===");
-    } else {
-        MYDEBUG_PRINTLN("=== Échec de connexion Adafruit IO ===");
-        MYDEBUG_PRINTLN("Code d'erreur : " + String(ret));
-        MYDEBUG_PRINTLN("Détail : " + String(MyAdafruitMqtt.connectErrorString(ret)));
-    }
-}
-
-inline bool ensureConnected() {
-    if (!MyAdafruitMqtt.connected()) {
-        MYDEBUG_PRINTLN("Reconnexion nécessaire avant publication");
-        connectAdafruitIO();
-        return MyAdafruitMqtt.connected();
-    }
-    return true;
-}
 
 /**
  * Class Distributeur représente un distributeur de rations dans une suite N.
@@ -220,9 +77,10 @@ public:
     }
 
     void commande(const int nombre) {
-        MYDEBUG_PRINTLN("=== Commande " + name + " ===");
-        MYDEBUG_PRINTLN(("Demande de " + std::to_string(nombre) + " rations").data());
-        MYDEBUG_PRINTLN(("État actuel : " + std::to_string(nbRation) + " rations disponibles").data());
+        MYDEBUG_PRINTLN("========== Commande " + name + " ==============");
+        MYDEBUG_PRINTLN("Demande de " + String(nombre) + " rations");
+        MYDEBUG_PRINTLN("État actuel : " + String(nbRation) + " rations disponibles");
+
 
         if (nombre < 0) {
             throw std::invalid_argument("La commande ne peut pas être de " + std::to_string(nombre));
@@ -237,14 +95,21 @@ public:
                     const int envoi = std::min(this->_nbSendRation, *pNombreRestant);
                     this->nbRation -= envoi;
                     *pNombreRestant -= envoi;
+                    MYDEBUG_PRINTLN("=== Progression de l'envoi ===");
+                    MYDEBUG_PRINTLN("Rations envoyées : " + String(envoi));
+                    MYDEBUG_PRINTLN("Restant à envoyer : " + String(*pNombreRestant));
+                    MYDEBUG_PRINTLN("Rations restantes dans " + name + " : " + String(nbRation));
 
+                    const int ready = getReadyCount();
                     // Publier le nombre de poissons prêts
-                    pubReady.publish(envoi);
+                    pubReady.publish(ready + envoi);
                     // Mettre à jour le nombre de rations restantes
                     this->adafruit_.publish(this->nbRation);
-                    pubCommande.publish(std::max(*pNombreRestant - envoi, 0));
+                    pubCommande.publish(std::max(*pNombreRestant, 0));
 
-                    if (*pNombreRestant == 0) {
+                    if (*pNombreRestant <= 0) {
+                        MYDEBUG_PRINTLN("=== Envoi terminé ===");
+
                         this->envoyerRationTicker.detach();
                     }
                 }
@@ -306,10 +171,13 @@ public:
                     _precedent->nbRation = oldPrecedentRation;
                     nbRation = oldRation;
                 }
+            } else {
+                MYDEBUG_PRINTLN("==========IL N'Y A PLUS ASSEZ DE " + _precedent->name + " =============");
             }
         }
         if (success) {
-            MYDEBUG_PRINTLN(("Copulation réussie : " + std::to_string(nbRation) + " rations après opération").data());
+            MYDEBUG_PRINT(("Copulation réussie : " + std::to_string(nbRation)).data());
+            MYDEBUG_PRINTLN(" " + name + " après opération");
         } else {
             MYDEBUG_PRINTLN("Échec de la copulation - Conditions non remplies");
         }
@@ -317,42 +185,104 @@ public:
         return success;
     }
 
-    void setRation(const int ration) {
-        this->nbRation = ration;
-    }
+    void setRation(const int ration) { this->nbRation = ration; }
+    void setPrecedent(MyDistributeur *precedent) { this->_precedent = precedent; }
+    void setNbMin(const int nbMin) { _nbMin = nbMin; }
+    void setNbMax(const int nbMax) { _nbMax = nbMax; }
+    void setCopulation(const int copulation) { _copulation = copulation; }
+    void setCopulationSec(const float copulationSec) { _copulationSec = copulationSec; }
+    void setNbBySecSend(const float nbBySecSend) { _nbBySecSend = nbBySecSend; }
+    void setNbSendRation(const int nbSendRation) { _nbSendRation = nbSendRation; }
+    void setEat(const int eat) { _eat = eat; }
+    void setName(const String &newName) { name = newName; }
 
-    void setPrecedent(MyDistributeur *precedent) {
-        this->_precedent = precedent;
-    }
-
-    [[nodiscard]] float getCopulationSec() const {
-        return this->_copulationSec;
-    }
-
-    [[nodiscard]] MyDistributeur *getPrecedent() const {
-        return this->_precedent;
-    }
-
-    friend std::ostream &operator<<(std::ostream &os, const MyDistributeur &distributeur) {
-        os << "Distributeur " << distributeur.name.c_str() << " : "
-                << distributeur.nbRation << "/" << distributeur._nbMax
-                << " rations (min: " << distributeur._nbMin << ")";
-        return os;
-    }
+    [[nodiscard]] float getCopulationSec() const { return this->_copulationSec; }
+    [[nodiscard]] MyDistributeur *getPrecedent() const { return this->_precedent; }
 };
 
 
-inline auto croquette = MyDistributeur("Croquette", 30000, 1000, 50000, 10, 1000, 0, 0, 0, pubNbRationCroquette);
-inline auto poissonRouge = MyDistributeur("Poisson Rouge", 30, 20, 100, 10, 3, 4, 30, 2000, pubNbRationPoissonRouge,
-                                          &croquette);
-inline auto achigan = MyDistributeur("Achigan", 10, 5, 20, 10, 1, 1, 15, 2, pubNbRationAchigan, &poissonRouge);
-inline auto achiganResto = MyDistributeur("Achigan du Restaurant", 12, 5, 30, 20, 1, 1, 15, 1, pubNbRationResto,
-                                          &achigan);
+inline auto croquette = MyDistributeur("Croquette", 30000, pubNbRationCroquette);
+inline auto poissonRouge = MyDistributeur("Poisson Rouge", 30, pubNbRationPoissonRouge, &croquette);
+inline auto achigan = MyDistributeur("Achigan", 10, pubNbRationAchigan, &poissonRouge);
+inline auto achiganResto = MyDistributeur("Achigan du Restaurant", 12, pubNbRationResto, &achigan);
 
+inline void loadDistributeurConfig() {
+    if (SPIFFS.exists("/config.json")) {
+        File configFile = SPIFFS.open("/config.json", "r");
+        if (configFile) {
+            DynamicJsonDocument doc(2048);
+            DeserializationError error = deserializeJson(doc, configFile);
+
+            if (!error) {
+                JsonObject distributeurs = doc["distributeurs"];
+
+                // Configuration de Croquette
+                if (JsonObject cfgCroquette = distributeurs["croquette"]) {
+                    croquette.setName(cfgCroquette["nom"].as<String>());
+                    croquette.setRation(cfgCroquette["nbRation"].as<int>());
+                    croquette.setNbMin(cfgCroquette["nbMin"].as<int>());
+                    croquette.setNbMax(cfgCroquette["nbMax"].as<int>());
+                    croquette.setNbBySecSend(cfgCroquette["nbBySecSend"].as<float>());
+                    croquette.setNbSendRation(cfgCroquette["nbSendRation"].as<int>());
+                    croquette.setCopulation(cfgCroquette["copulation"].as<int>());
+                    croquette.setCopulationSec(cfgCroquette["copulationSec"].as<float>());
+                    croquette.setEat(cfgCroquette["eat"].as<int>());
+                }
+
+                // Configuration de Poisson Rouge
+                if (JsonObject cfgPoissonRouge = distributeurs["poissonRouge"]) {
+                    poissonRouge.setName(cfgPoissonRouge["nom"].as<String>());
+                    poissonRouge.setRation(cfgPoissonRouge["nbRation"].as<int>());
+                    poissonRouge.setNbMin(cfgPoissonRouge["nbMin"].as<int>());
+                    poissonRouge.setNbMax(cfgPoissonRouge["nbMax"].as<int>());
+                    poissonRouge.setNbBySecSend(cfgPoissonRouge["nbBySecSend"].as<float>());
+                    poissonRouge.setNbSendRation(cfgPoissonRouge["nbSendRation"].as<int>());
+                    poissonRouge.setCopulation(cfgPoissonRouge["copulation"].as<int>());
+                    poissonRouge.setCopulationSec(cfgPoissonRouge["copulationSec"].as<float>());
+                    poissonRouge.setEat(cfgPoissonRouge["eat"].as<int>());
+                }
+
+                // Configuration d'Achigan
+                if (JsonObject cfgAchigan = distributeurs["achigan"]) {
+                    achigan.setName(cfgAchigan["nom"].as<String>());
+                    achigan.setRation(cfgAchigan["nbRation"].as<int>());
+                    achigan.setNbMin(cfgAchigan["nbMin"].as<int>());
+                    achigan.setNbMax(cfgAchigan["nbMax"].as<int>());
+                    achigan.setNbBySecSend(cfgAchigan["nbBySecSend"].as<float>());
+                    achigan.setNbSendRation(cfgAchigan["nbSendRation"].as<int>());
+                    achigan.setCopulation(cfgAchigan["copulation"].as<int>());
+                    achigan.setCopulationSec(cfgAchigan["copulationSec"].as<float>());
+                    achigan.setEat(cfgAchigan["eat"].as<int>());
+                }
+
+                // Configuration d'Achigan Restaurant
+                if (JsonObject cfgAchiganResto = distributeurs["achiganResto"]) {
+                    achiganResto.setName(cfgAchiganResto["nom"].as<String>());
+                    achiganResto.setRation(cfgAchiganResto["nbRation"].as<int>());
+                    achiganResto.setNbMin(cfgAchiganResto["nbMin"].as<int>());
+                    achiganResto.setNbMax(cfgAchiganResto["nbMax"].as<int>());
+                    achiganResto.setNbBySecSend(cfgAchiganResto["nbBySecSend"].as<float>());
+                    achiganResto.setNbSendRation(cfgAchiganResto["nbSendRation"].as<int>());
+                    achiganResto.setCopulation(cfgAchiganResto["copulation"].as<int>());
+                    achiganResto.setCopulationSec(cfgAchiganResto["copulationSec"].as<float>());
+                    achiganResto.setEat(cfgAchiganResto["eat"].as<int>());
+                }
+
+                MYDEBUG_PRINTLN("Configuration des distributeurs chargée avec succès");
+            } else {
+                MYDEBUG_PRINTLN("Erreur lors du parsing du fichier de configuration");
+            }
+            configFile.close();
+        }
+    } else {
+        MYDEBUG_PRINTLN("Fichier de configuration des distributeurs non trouvé");
+    }
+}
 
 inline void setupDistributeur() {
     setupMQTT();
 
+    loadDistributeurConfig();
     // Vérification de la mémoire
     if (EspClass::getFreeHeap() < 4096) {
         MYDEBUG_PRINTLN("Mémoire insuffisante lors de l'initialisation");
@@ -406,11 +336,15 @@ inline void setupDistributeur() {
         achiganResto.setRation(atoi(data));
     });
     MyAdafruitMqtt.subscribe(&subNbRationResto);
+    delay(2000);
 
     subCommande.setCallback([](char *data, uint16_t len) {
+        MYDEBUG_PRINTLN("Commande reçue : " + String(data));
         achiganResto.commande(atoi(data));
+        MYDEBUG_PRINTLN("Commande traitée");
     });
     MyAdafruitMqtt.subscribe(&subCommande);
+
 
     MyAdafruitMqtt.processPackets(2000);
 
@@ -444,6 +378,12 @@ inline void loopDistributeur() {
     static unsigned long lastPing = 0;
 
     const unsigned long now = millis();
+    static unsigned long lastDebug = 0;
+    if (now - lastDebug >= 5000) {
+        // Toutes les 5 secondes
+        lastDebug = now;
+        MYDEBUG_PRINTLN("Status MQTT : " + String(MyAdafruitMqtt.connected() ? "Connecté" : "Déconnecté"));
+    }
 
     // Gestion du ping
     if (constexpr unsigned long pingInterval = 5000; now - lastPing >= pingInterval) {
