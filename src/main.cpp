@@ -3,7 +3,9 @@
 
 int i = 0;
 
+#include "MySPIFFS.h"       // SPIFF
 #include "MyDebug.h"        // Debug
+#include "MyWebServer.h"    // WebServer
 #include "MyWiFi.h"         // WiFi
 #include "MyTicker.h"       // Tickers
 #include "MyDistributeur.h"
@@ -12,7 +14,7 @@ int i = 0;
 void setup() {
     // 1. Initialisation du debug
     Serial.begin(115200);
-    delay(2000); // Augmenté à 2 secondes
+    delay(2000);
     setupDebug();
     MYDEBUG_PRINTLN("----- SETUP -----");
 
@@ -29,7 +31,20 @@ void setup() {
     }
     delay(5000);
 
-    // 3. Ticker avec délai plus long
+    // 3. WebServer avec gestion d'erreur
+    try {
+        setupWebServer(); // Initialisation du Serveur Web();
+        MYDEBUG_PRINTLN("----- WEBSERVER OK -----");
+        delay(5000);
+        // Attente de stabilisation du WiFi
+    } catch (const std::exception &e) {
+        MYDEBUG_PRINT("Erreur WEBSERVER : ");
+        MYDEBUG_PRINTLN(e.what());
+        return;
+    }
+    delay(5000);
+
+    // 4. Ticker avec délai plus long
     try {
         setupTicker();
         MYDEBUG_PRINTLN("----- TICKER OK -----");
@@ -40,7 +55,18 @@ void setup() {
         return;
     }
 
-    // 4. Distributeur avec délai et surveillance
+    // 5. SPIFFS
+    try {
+        setupSPIFFS(true);
+        MYDEBUG_PRINTLN("----- SPIFFS OK -----");
+        delay(5000);
+    } catch (const std::exception &e) {
+        MYDEBUG_PRINT("Erreur SPIFFr : ");
+        MYDEBUG_PRINTLN(e.what());
+        return;
+    }
+
+    // 6. Distributeur avec délai et surveillance
     try {
         MYDEBUG_PRINTLN("Démarrage de l'initialisation du distributeur");
         setupDistributeur();
@@ -56,19 +82,12 @@ void setup() {
 }
 
 void loop() {
-    static bool firstLoop = true;
     static unsigned long lastWifiCheck = 0;
     static unsigned long lastMqttProcessing = 0;
-    const unsigned long processingInterval = 1000; // 1 seconde entre les traitements
+    constexpr unsigned long processingInterval = 1000; // 1 seconde entre les traitements
 
     // Ne pas utiliser yield() directement
     delay(100);
-
-    if (firstLoop) {
-        MYDEBUG_PRINTLN("Première itération de la boucle");
-        firstLoop = false;
-        delay(2000);
-    }
 
     // Vérification périodique du WiFi
     unsigned long currentMillis = millis();
@@ -92,6 +111,8 @@ void loop() {
             delay(5000);
         }
     }
+
+    loopWebServer();
 
     // Délai de base pour éviter la surcharge
     delay(100);
